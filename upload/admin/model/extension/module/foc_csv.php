@@ -108,7 +108,7 @@ class ModelExtensionModuleFocCsv extends ModelExtensionModuleFocCsvCommon {
       'keyField' => 'product_id',
       'skipLines' => 0,
       'bindings' => new stdclass,
-      'importMode' => 'updateCreate',
+      'importMode' => 'onlyUpdate',
       'imagesImportMode' => 'add',
       'csvImageFieldDelimiter' => ';',
       'previewFromGallery' => true,
@@ -162,6 +162,14 @@ class ModelExtensionModuleFocCsv extends ModelExtensionModuleFocCsvCommon {
     }
 
     return $tableData;
+  }
+
+  private function productSpecialTemplate ($data = array()) {
+    return array_replace(array(
+      'date_start' => date('Y-m-d'),
+      'date_end' => date('Y-m-d',strtotime("+1 day")),
+      'price' => 0
+    ), $data);
   }
 
   private function productToStoreTemplate () {
@@ -594,6 +602,10 @@ class ModelExtensionModuleFocCsv extends ModelExtensionModuleFocCsvCommon {
       $productData['stock_status_id'] = array_search($productData['stock_status_id'], $profile['stockStatusRewrites']);
     }
 
+    if (isset($tablesData['product_special'])) {
+      $productData['product_special'] = $this->productSpecialTemplate($tablesData['product_special']);
+    }
+    
     $productData['product_store'] = $this->productToStoreTemplate();
 
     /*
@@ -721,7 +733,7 @@ class ModelExtensionModuleFocCsv extends ModelExtensionModuleFocCsvCommon {
             $this->db->query('INSERT INTO ' . DB_PREFIX . 'category_description (category_id, name, language_id) VALUES ('.(int)$prev_id.',"' . $this->db->escape($categoryName) . '", ' . (int)$this->language_id . ')');
           }
           else {
-            $this->db->query('UPDATE ' . DB_PREFIX . 'category_description SET name = "' . $this->db->escape($categoryName) . '", language_id = ' . (int)$this->language_id . ' WHERE category_id = ' . (int)$id);
+            $this->db->query('UPDATE ' . DB_PREFIX . 'category_description SET name = "' . $this->db->escape($categoryName) . '" WHERE category_id = ' . (int)$id .' AND language_id = ' . (int)$this->language_id );
             $prev_id = $id;
           }
 
@@ -929,6 +941,17 @@ class ModelExtensionModuleFocCsv extends ModelExtensionModuleFocCsvCommon {
         }
 
         $this->db->query("INSERT INTO " . DB_PREFIX . "product_description SET " . rtrim($insert_string, ','));
+      }
+    }
+
+    // product_special update
+    if (isset($data['product_special'])
+        && !empty($data['product_special'])
+    ) {
+      $this->db->query("DELETE FROM " . DB_PREFIX . "product_special WHERE product_id = '" . (int)$product_id . "'");
+
+      if (isset($data['product_special']) && $data['product_special']['price'] > 0) {
+        $this->db->query("INSERT INTO " . DB_PREFIX . "product_special SET product_id = '" . (int)$product_id . "', price = '" . (float)$data['product_special']['price'] . "', customer_group_id = 1, priority = 0, date_start = '" . $this->db->escape($data['product_special']['date_start']) . "', date_end = '" . $this->db->escape($data['product_special']['date_end']) . "'");
       }
     }
 
